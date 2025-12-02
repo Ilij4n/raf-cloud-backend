@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.server.ResponseStatusException
 import rs.edu.raf.cloud.backend.core.util.ApiResponse
 
 @RestControllerAdvice
@@ -45,5 +46,12 @@ class GlobalExceptionHandler {
             .body(ApiResponse.error("You do not have permission to perform this action."))
     }
 
-    // Todo, the above is for perms, see what we will do for 401
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatusException(ex: ResponseStatusException): ResponseEntity<ApiResponse<Nothing>> {
+        logger.warn("Action blocked: {}", ex.reason) // Log only the message
+
+        return ResponseEntity
+            .status(ex.statusCode)
+            .body(ApiResponse.error(ex.reason ?: "An error occurred"))
+    }
 }

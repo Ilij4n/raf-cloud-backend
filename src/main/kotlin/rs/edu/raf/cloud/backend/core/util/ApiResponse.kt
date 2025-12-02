@@ -5,7 +5,7 @@ data class ApiResponse<T>(
     val message: String? = null,
     val data: T? = null
 ) {
-    // Companion object for easy factory methods
+    // A dto response wrapper with some generic fields
     companion object {
         fun <T> success(data: T, message: String? = null): ApiResponse<T> {
             return ApiResponse(success = true, message = message, data = data)

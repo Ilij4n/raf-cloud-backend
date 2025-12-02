@@ -37,7 +37,7 @@ class SecurityAspect {
         // (Or ALL, depending on your logic. Usually "Any" is standard).
         val requiredPermissions = checkSecurity.permissions.map { it.authority }
 
-        val hasPermission = requiredPermissions.any { it in userAuthorities }
+        val hasPermission = requiredPermissions.all { it in userAuthorities }
 
         if (!hasPermission) {
             throw ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to perform this action.")
