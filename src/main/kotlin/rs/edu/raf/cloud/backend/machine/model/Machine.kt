@@ -52,7 +52,8 @@ enum class MachineStatus {
     STOPPED, // "OFF" in your front, let's map it standardly or use OFF
     RUNNING, // "ON"
     STOPPING, // TURNING_OFF
-    STARTING  // TURNING_ON
+    STARTING,  // TURNING_ON
+    RESTARTING,
     // Note: Use the exact strings from your frontend or map them using @JsonValue
 }
 
