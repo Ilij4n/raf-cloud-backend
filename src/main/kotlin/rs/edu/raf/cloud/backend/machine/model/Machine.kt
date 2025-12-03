@@ -12,11 +12,11 @@ class Machine(
     var id: Long? = null,
 
     @Column(nullable = false)
-    var name: String,
+    var name: String = "",
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    var status: MachineStatus,
+    var status: MachineStatus? = null,
 
     @Column(nullable = false)
     var active: Boolean = true, // For soft delete
@@ -27,7 +27,7 @@ class Machine(
     // Relationship to User
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    var user: User
+    var user: User? = null
 
 ) {
     override fun equals(other: Any?): Boolean {
@@ -54,4 +54,10 @@ enum class MachineStatus {
     STOPPING, // TURNING_OFF
     STARTING  // TURNING_ON
     // Note: Use the exact strings from your frontend or map them using @JsonValue
+}
+
+enum class MachineOperation(
+    val validMachineStatus: MachineStatus,
+) {
+    START(MachineStatus.STOPPED), STOP(MachineStatus.RUNNING), RESTART(MachineStatus.RUNNING)
 }
