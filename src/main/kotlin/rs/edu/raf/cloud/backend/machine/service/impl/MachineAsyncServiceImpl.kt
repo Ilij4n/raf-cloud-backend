@@ -20,8 +20,7 @@ class MachineAsyncService(
     private val messagingTemplate: SimpMessagingTemplate
 ) {
 
-    // ... helper methods (toDto, sleepRandomly) ...
-
+    // These functions are effectively there to simulate the delay and update the frontend states via socket
     @Async("taskExecutor")
     fun startMachine(machineId: Long) {
         performAction(machineId, MachineOperation.START, MachineStatus.STARTING, MachineStatus.RUNNING)
@@ -57,24 +56,30 @@ class MachineAsyncService(
         intermediateStatus: MachineStatus,
         finalStatus: MachineStatus
     ) {
+        // Get the status the machine had to be in beforehands in case of error
+        val revertStatus = if (operation == MachineOperation.START) MachineStatus.STOPPED else MachineStatus.RUNNING
+
         try {
             updateAndNotify(machineId, intermediateStatus)
             sleepRandomly()
             updateAndNotify(machineId, finalStatus)
         } catch (e: Exception) {
             handleError(machineId, operation.name, e.message ?: "Unknown error")
+
+            // Revert to original state
+            updateAndNotify(machineId, revertStatus)
         }
     }
 
-    // REMOVED @Transactional to fix the warning.
-    // machineRepository.save() is already transactional enough for this single operation.
     fun updateAndNotify(machineId: Long, status: MachineStatus) {
-        val machine = machineRepository.findById(machineId).orElse(null) ?: return
-        machine.status = status
-        val savedMachine = machineRepository.save(machine)
 
-        // Broadcast to WebSocket
-        messagingTemplate.convertAndSend("/topic/machines", savedMachine.toDto())
+        val machine = machineRepository.findByIdWithUser(machineId)
+            .orElseThrow { RuntimeException("Machine $machineId disappeared during execution") }
+
+        machine.status = status
+        machineRepository.save(machine)
+
+        messagingTemplate.convertAndSend("/topic/machines", machine.toDto())
     }
 
     private fun handleError(machineId: Long, operation: String, errorMsg: String) {

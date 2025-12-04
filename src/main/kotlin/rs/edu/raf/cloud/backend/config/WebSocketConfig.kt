@@ -11,19 +11,18 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 class WebSocketConfig : WebSocketMessageBrokerConfigurer {
 
     override fun configureMessageBroker(config: MessageBrokerRegistry) {
-        // Enables a simple in-memory broker
-        // Clients will subscribe to "/topic/machines" to receive updates
+        // All the STOMP SEND requests made to the destination with prefix /topic will be fanned out to all the listneners by the broker
         config.enableSimpleBroker("/topic")
 
-        // Clients send messages to endpoints starting with "/app" (not needed for this project yet, but standard)
+        // All the send requests made to the /app destination will be taken in by our backend
+        // We do not have client -> server communication in our project, though this is common practice
         config.setApplicationDestinationPrefixes("/app")
     }
 
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
-        // The endpoint the frontend connects to.
-        // e.g. socket = new WebSocket('ws://localhost:8080/ws');
+        // The endpoint to which the subscribers will send an http request to upgrade their connection to a socket
         registry.addEndpoint("/ws")
-            .setAllowedOriginPatterns("*") // Allow Angular (localhost:4200) to connect
-            .withSockJS() // Enable SockJS fallback options
+            .setAllowedOriginPatterns("*") // Allow any origin to connect
+            .withSockJS() // A common fallback option if the connection does not succeed
     }
 }

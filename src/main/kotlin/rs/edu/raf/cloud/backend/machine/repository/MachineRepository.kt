@@ -12,6 +12,12 @@ import java.util.Optional
 @Repository
 interface MachineRepository : JpaRepository<Machine, Long> {
 
+    // Spring generates: SELECT * FROM machines WHERE status IN ('STARTING', 'STOPPING', 'RESTARTING')
+    fun findAllByStatusIn(statuses: List<MachineStatus>): List<Machine>
+
+    @Query("SELECT m FROM Machine m JOIN FETCH m.user WHERE m.id = :id")
+    fun findByIdWithUser(@Param("id") id: Long): Optional<Machine>
+
     // The logic:
     // 1. Filter by soft delete (m.active = true)
     // 2. Filter by User ID (unless userId is null, which means Admin sees all)

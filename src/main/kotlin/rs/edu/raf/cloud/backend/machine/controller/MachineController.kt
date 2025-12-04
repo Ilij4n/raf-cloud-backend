@@ -61,21 +61,21 @@ class MachineController(
     @PostMapping("/{id}/start")
     fun startMachine(@PathVariable id: Long, @RequestBody request: MachineActionRequest): ResponseEntity<ApiResponse<Unit>> {
         // Delegates to the unified method
-        machineService.performAction(id, MachineOperation.START, request.date)
+        machineService.scheduleAction(id, MachineOperation.START, request.date)
         return ResponseEntity.ok(ApiResponse.success(Unit, "Start action initiated"))
     }
 
     @CheckSecurity(permissions = [Permission.STOP_MACHINE])
     @PostMapping("/{id}/stop")
     fun stopMachine(@PathVariable id: Long, @RequestBody request: MachineActionRequest): ResponseEntity<ApiResponse<Unit>> {
-        machineService.performAction(id, MachineOperation.STOP, request.date)
+        machineService.scheduleAction(id, MachineOperation.STOP, request.date)
         return ResponseEntity.ok(ApiResponse.success(Unit, "Stop action initiated"))
     }
 
     @CheckSecurity(permissions = [Permission.RESTART_MACHINE])
     @PostMapping("/{id}/restart")
     fun restartMachine(@PathVariable id: Long, @RequestBody request: MachineActionRequest): ResponseEntity<ApiResponse<Unit>> {
-        machineService.performAction(id, MachineOperation.RESTART, request.date)
+        machineService.scheduleAction(id, MachineOperation.RESTART, request.date)
         return ResponseEntity.ok(ApiResponse.success(Unit, "Restart action initiated"))
     }
 }

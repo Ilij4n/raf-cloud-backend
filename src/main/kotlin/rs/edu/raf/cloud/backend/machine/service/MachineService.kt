@@ -13,7 +13,7 @@ interface MachineService {
         dateTo: LocalDateTime?
     ): List<MachineResponse>
 
-    fun performAction(
+    fun scheduleAction(
         id: Long,
         operation: MachineOperation,
         scheduledAt: LocalDateTime?

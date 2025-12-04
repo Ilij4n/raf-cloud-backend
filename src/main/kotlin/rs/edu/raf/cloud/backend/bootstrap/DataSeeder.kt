@@ -3,6 +3,8 @@ package rs.edu.raf.cloud.backend.bootstrap
 import org.springframework.boot.CommandLineRunner
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
+import rs.edu.raf.cloud.backend.machine.model.MachineStatus
+import rs.edu.raf.cloud.backend.machine.repository.MachineRepository
 import rs.edu.raf.cloud.backend.user.model.Permission
 import rs.edu.raf.cloud.backend.user.model.User
 import rs.edu.raf.cloud.backend.user.repository.UserRepository
@@ -10,7 +12,8 @@ import rs.edu.raf.cloud.backend.user.repository.UserRepository
 @Component
 class DataSeeder(
     private val userRepository: UserRepository,
-    private val passwordEncoder: PasswordEncoder
+    private val passwordEncoder: PasswordEncoder,
+    private val machineRepository: MachineRepository,
 ) : CommandLineRunner {
 
     override fun run(vararg args: String?) {
@@ -60,6 +63,19 @@ class DataSeeder(
             )
             userRepository.save(sadUser)
             println("DATA SEEDER: No-permission user created (email: noperms@raf.rs, pass: user)")
+        }
+
+        // Fix Zombie Machines
+        val stuckMachines = machineRepository.findAllByStatusIn(
+            listOf(MachineStatus.STARTING, MachineStatus.STOPPING, MachineStatus.RESTARTING)
+        )
+
+        if (stuckMachines.isNotEmpty()) {
+            println("SANITY CHECK: Found ${stuckMachines.size} stuck machines. Resetting to STOPPED.")
+            stuckMachines.forEach {
+                it.status = MachineStatus.STOPPED // Or OFF, safe default
+                machineRepository.save(it)
+            }
         }
     }
 }

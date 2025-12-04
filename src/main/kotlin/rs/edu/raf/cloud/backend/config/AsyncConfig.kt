@@ -12,12 +12,16 @@ import java.util.concurrent.Executor
 @EnableScheduling
 class AsyncConfig {
 
-    // Optional: Customize the thread pool if you want specific performance settings
+    // name -> an argument which lets functions annotated with @Async become tasks to be executed by threads of this Executor thread pool
     @Bean(name = ["taskExecutor"])
     fun taskExecutor(): Executor {
         val executor = ThreadPoolTaskExecutor()
+        // Standard thread pool size
         executor.corePoolSize = 5
+        // Increased thread pool size if queue is full
         executor.maxPoolSize = 10
+        // Queue size for tasks to be waiting in if there is currently no thread to process them
+        // Note - if the queue is full and all 10 threads are busy, the task is rejected and an exception is thrown
         executor.queueCapacity = 500
         executor.setThreadNamePrefix("MachineAsync-")
         executor.initialize()

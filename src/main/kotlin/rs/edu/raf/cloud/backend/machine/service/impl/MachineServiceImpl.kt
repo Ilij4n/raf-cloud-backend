@@ -20,7 +20,8 @@ import java.time.LocalDateTime
 class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (if you aren't using an interface explicitly, class is fine)
     private val machineRepository: MachineRepository,
     private val userRepository: UserRepository,
-    private val scheduledOperationRepository: ScheduledOperationRepository // <--- ADDED THIS
+    private val machineAsyncService: MachineAsyncService,
+    private val scheduledOperationRepository: ScheduledOperationRepository
 ) : MachineService {
 
     override fun search(
@@ -45,11 +46,11 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         return machines.map { it.toDto() }
     }
 
-    override fun performAction(id: Long, operation: MachineOperation, scheduledAt: LocalDateTime?) {
-        // Optimization: Get user once here if needed, but your helpers are fine for now.
+    override fun scheduleAction(id: Long, operation: MachineOperation, scheduledAt: LocalDateTime?) {
+        // Looks at the user id and machine id, throws if not the owner of machine or not admin
         val machine = findMachineWithAccessControl(id)
 
-        // 1. Check if it is a Scheduled Future Task
+        // scheduledAt == null -> task is instant
         if (scheduledAt != null && scheduledAt.isAfter(LocalDateTime.now())) {
             val scheduledOp = ScheduledOperation(
                 scheduledAt = scheduledAt,
@@ -57,6 +58,7 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
                 machine = machine,
                 createdById = getCurrentUserId()
             )
+            // If scheduled, just save the entry to the db
             scheduledOperationRepository.save(scheduledOp)
             return
         }
@@ -64,10 +66,14 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         if (machine.status != operation.validMachineStatus)
             throw RuntimeException("Machine must be in state ${operation.validMachineStatus} to perform ${operation.name}.")
 
-        // 3. Trigger Async Execution
-        // We will implement this next!
-        // asyncService.executeAsyncAction(machine.id!!, operation)
-        println("DEBUG: Executing instant action $operation on machine $id")
+        // Launches an async task in a new thread to finish the action, as to not block execution since these trigger Thread.sleep(Seconds)
+        // These are effectively coroutines in kotlin which I presume can run in parallel
+        // If these were not async, the http answer would arrive at the same time as a socket emit, not before
+        when (operation) {
+            MachineOperation.START -> machineAsyncService.startMachine(machine.id!!)
+            MachineOperation.STOP -> machineAsyncService.stopMachine(machine.id!!)
+            MachineOperation.RESTART -> machineAsyncService.restartMachine(machine.id!!)
+        }
     }
 
 
