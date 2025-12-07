@@ -1,8 +1,10 @@
 package rs.edu.raf.cloud.backend.user.service.impl
 
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import rs.edu.raf.cloud.backend.core.auth.TokenService
+import rs.edu.raf.cloud.backend.core.exception.BusinessException
 import rs.edu.raf.cloud.backend.dto.*
 import rs.edu.raf.cloud.backend.user.model.User
 import rs.edu.raf.cloud.backend.user.repository.UserRepository
@@ -17,10 +19,10 @@ class UserServiceImpl(
 
     override fun login(request: LoginRequest): LoginResponse {
         val user = userRepository.findByEmail(request.email)
-            .orElseThrow { RuntimeException("User not found") }
+            .orElseThrow { BusinessException("User not found") }
 
         if (!passwordEncoder.matches(request.password, user.passwordHash)) {
-            throw RuntimeException("Invalid password")
+            throw BusinessException("Invalid password")
         }
 
         // Generate JWT
@@ -30,7 +32,7 @@ class UserServiceImpl(
 
     override fun createUser(request: CreateUserRequest): UserResponse {
         if (userRepository.existsByEmail(request.email)) {
-            throw RuntimeException("Email already in use")
+            throw BusinessException("Email already in use")
         }
 
         val newUser = User(
@@ -52,13 +54,13 @@ class UserServiceImpl(
 
     override fun findById(id: Long): UserResponse {
         return userRepository.findById(id)
-            .orElseThrow { RuntimeException("User not found with id: $id") }
+            .orElseThrow { BusinessException("User not found with id: $id") }
             .toDto()
     }
 
     override fun updateUser(id: Long, request: UpdateUserRequest): UserResponse {
         val user = userRepository.findById(id)
-            .orElseThrow { RuntimeException("User not found with id: $id") }
+            .orElseThrow { BusinessException("User not found with id: $id") }
 
         // Update fields only
         // Since request fields are val (immutable) but user fields are var (mutable), just assign
@@ -82,9 +84,14 @@ class UserServiceImpl(
     }
 
     override fun deleteUser(id: Long) {
-        if (!userRepository.existsById(id)) {
-            throw RuntimeException("User not found with id: $id")
-        }
+        val user = userRepository.findById(id)
+        if (user.isEmpty)
+            throw BusinessException("User not found with id: $id")
+
+        val userEmail = SecurityContextHolder.getContext().authentication.name
+        if(user.get().email == userEmail)
+            throw BusinessException("Cannot delete your own account")
+
         userRepository.deleteById(id)
     }
 

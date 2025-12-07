@@ -23,6 +23,5 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
         // The endpoint to which the subscribers will send an http request to upgrade their connection to a socket
         registry.addEndpoint("/ws")
             .setAllowedOriginPatterns("*") // Allow any origin to connect
-            .withSockJS() // A common fallback option if the connection does not succeed
     }
 }

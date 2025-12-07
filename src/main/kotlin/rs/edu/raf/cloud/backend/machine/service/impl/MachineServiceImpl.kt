@@ -2,6 +2,7 @@ package rs.edu.raf.cloud.backend.machine.service.impl
 
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.stereotype.Service
+import rs.edu.raf.cloud.backend.core.exception.BusinessException
 import rs.edu.raf.cloud.backend.dto.CreateMachineRequest
 import rs.edu.raf.cloud.backend.dto.MachineResponse
 import rs.edu.raf.cloud.backend.machine.model.Machine
@@ -15,6 +16,7 @@ import rs.edu.raf.cloud.backend.user.model.Permission
 import rs.edu.raf.cloud.backend.user.model.User
 import rs.edu.raf.cloud.backend.user.repository.UserRepository
 import java.time.LocalDateTime
+import java.time.ZoneOffset
 
 @Service
 class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (if you aren't using an interface explicitly, class is fine)
@@ -64,7 +66,7 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         }
 
         if (machine.status != operation.validMachineStatus)
-            throw RuntimeException("Machine must be in state ${operation.validMachineStatus} to perform ${operation.name}.")
+            throw BusinessException("Machine must be in state ${operation.validMachineStatus} to perform ${operation.name}.")
 
         // Launches an async task in a new thread to finish the action, as to not block execution since these trigger Thread.sleep(Seconds)
         // These are effectively coroutines in kotlin which I presume can run in parallel
@@ -94,7 +96,7 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
     fun destroyMachine(id: Long) {
         val machine = findMachineWithAccessControl(id)
         if (machine.status != MachineStatus.STOPPED) {
-            throw RuntimeException("Machine must be STOPPED to be destroyed")
+            throw BusinessException("Machine must be STOPPED to be destroyed")
         }
         machine.active = false // Soft delete
         machineRepository.save(machine)
@@ -108,7 +110,7 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         val auth = SecurityContextHolder.getContext().authentication
         val email = auth.name
         return userRepository.findByEmail(email)
-            .orElseThrow { RuntimeException("User not found") }
+            .orElseThrow { BusinessException("User not found") }
     }
 
     private fun getCurrentUserId(): Long = findUserOrThrow().id!!
@@ -117,11 +119,11 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         val user = findUserOrThrow()
 
         val machine = machineRepository.findByIdAndActiveTrue(id)
-            .orElseThrow { RuntimeException("Machine not found") }
+            .orElseThrow { BusinessException("Machine not found") }
 
         // Access Control: If not admin and not owner -> Block
         if (!user.isAdmin() && machine.user?.id != user.id) {
-            throw RuntimeException("You do not have access to this machine")
+            throw BusinessException("You do not have access to this machine")
         }
         return machine
     }

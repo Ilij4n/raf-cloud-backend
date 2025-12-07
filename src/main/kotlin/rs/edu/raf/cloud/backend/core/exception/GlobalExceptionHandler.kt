@@ -13,45 +13,35 @@ class GlobalExceptionHandler {
 
     private val logger = LoggerFactory.getLogger(GlobalExceptionHandler::class.java)
 
-    // For handling validation errors (@Valid, @NotBlank, @Email)
+    // 1. EXPECTED ERRORS (Validation)
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationErrors(ex: MethodArgumentNotValidException): ResponseEntity<ApiResponse<Nothing>> {
-        // Kotlin's 'joinToString' replaces the verbose Java Stream logic
-        val errorMessage = ex.bindingResult.fieldErrors.joinToString(", ") { error ->
-            "${error.field}: ${error.defaultMessage}"
-        }
-
-        logger.error("Validation error: {}", errorMessage)
-
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST) // 400
-            .body(ApiResponse.error(errorMessage))
+        val errorMessage = ex.bindingResult.fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
+        return ResponseEntity.badRequest().body(ApiResponse.error(errorMessage))
     }
 
-    // Handling generic runtime exceptions - usually will be manually thrown by us
-    @ExceptionHandler(RuntimeException::class)
-    fun handleRuntimeException(ex: RuntimeException): ResponseEntity<ApiResponse<Nothing>> {
-        logger.error("Runtime exception occurred:", ex)
-
-        return ResponseEntity
-            .status(HttpStatus.BAD_REQUEST) // 400
-            .body(ApiResponse.error(ex.message ?: "An unknown error occurred"))
+    // 2. EXPECTED ERRORS (Our Business Logic)
+    @ExceptionHandler(BusinessException::class)
+    fun handleBusinessException(ex: BusinessException): ResponseEntity<ApiResponse<Nothing>> {
+        // We trust the message in BusinessException because WE wrote it.
+        return ResponseEntity.status(ex.status).body(ApiResponse.error(ex.message))
     }
 
-    // Possibly for exceptions to be thrown by the aspect
-    @ExceptionHandler(AccessDeniedException::class)
-    fun handleAccessDenied(ex: AccessDeniedException): ResponseEntity<ApiResponse<Nothing>> {
-        return ResponseEntity
-            .status(HttpStatus.FORBIDDEN) // 401
-            .body(ApiResponse.error("You do not have permission to perform this action."))
-    }
-
+    // 3. EXPECTED ERRORS (Security Aspect)
     @ExceptionHandler(ResponseStatusException::class)
     fun handleResponseStatusException(ex: ResponseStatusException): ResponseEntity<ApiResponse<Nothing>> {
-        logger.warn("Action blocked: {}", ex.reason) // Log only the message
+        return ResponseEntity.status(ex.statusCode).body(ApiResponse.error(ex.reason ?: "Access Denied"))
+    }
 
+    // 4. UNEXPECTED ERRORS (NPEs, Database crashes, etc.)
+    @ExceptionHandler(Exception::class)
+    fun handleUnexpectedException(ex: Exception): ResponseEntity<ApiResponse<Nothing>> {
+        // Log the full stack trace for the developer
+        logger.error("Unexpected Internal Error: ", ex)
+
+        // Send a SAFE, generic message to the user
         return ResponseEntity
-            .status(ex.statusCode)
-            .body(ApiResponse.error(ex.reason ?: "An error occurred"))
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.error("An unexpected internal error occurred. Please contact support."))
     }
 }

@@ -47,6 +47,8 @@ class MachineAsyncService(
 
         } catch (e: Exception) {
             handleError(machineId, "RESTART", e.message ?: "Unknown error")
+            // If failed, revert to previous state
+            updateAndNotify(machineId, MachineStatus.RUNNING)
         }
     }
 

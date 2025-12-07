@@ -45,20 +45,19 @@ class User(
 
 enum class Permission(val authority: String) {
     // User permissions
-    CREATE_USER("can_create_users"),
-    READ_USER("can_read_users"),
-    UPDATE_USER("can_update_users"),
-    DELETE_USER("can_delete_users"),
+    CREATE_USER("CREATE_USER"),
+    READ_USER("READ_USER"),
+    UPDATE_USER("UPDATE_USER"),
+    DELETE_USER("DELETE_USER"),
 
     // Machine permissions
-    SEARCH_MACHINE("can_search_machines"),
-    START_MACHINE("can_start_machines"),
-    STOP_MACHINE("can_stop_machines"),
-    RESTART_MACHINE("can_restart_machines"),
-    CREATE_MACHINE("can_create_machines"),
-    DESTROY_MACHINE("can_destroy_machines"); // "Destroy" vs "Delete" as per spec
+    SEARCH_MACHINE("SEARCH_MACHINE"),
+    START_MACHINE("START_MACHINE"),
+    STOP_MACHINE("STOP_MACHINE"),
+    RESTART_MACHINE("RESTART_MACHINE"),
+    CREATE_MACHINE("CREATE_MACHINE"),
+    DESTROY_MACHINE("DESTROY_MACHINE");
 
-    // Helper to allow Spring Security to see these as "Authorities"
     override fun toString(): String {
         return authority
     }

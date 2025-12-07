@@ -11,6 +11,9 @@ import org.springframework.security.web.SecurityFilterChain
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import rs.edu.raf.cloud.backend.core.auth.JwtAuthenticationFilter
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.CorsConfigurationSource
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
 @Configuration
 @EnableWebSecurity
@@ -43,11 +46,12 @@ class SecurityConfig(
             .authorizeHttpRequests {
                 // Public endpoints
                 it.requestMatchers("/api/auth/login").permitAll()
-
-                // Swagger UI (Optional, good to have open)
                 it.requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
 
-                // Everything else requires a valid token
+                // ALLOW WEBSOCKET HANDSHAKE
+                it.requestMatchers("/ws/**").permitAll() // <--- ADD THIS
+
+                // Everything else requires auth
                 it.anyRequest().authenticated()
             }
 
@@ -64,5 +68,26 @@ class SecurityConfig(
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
 
         return http.build()
+    }
+
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val configuration = CorsConfiguration()
+
+        // 1. Allow your Frontend Origin
+        configuration.allowedOrigins = listOf("http://localhost:4200")
+
+        // 2. Allow HTTP Methods
+        configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "OPTIONS")
+
+        // 3. Allow Headers (specifically Authorization for the JWT)
+        configuration.allowedHeaders = listOf("Authorization", "Content-Type")
+
+        // 4. Allow Credentials (if you ever needed cookies, irrelevant for JWT but good practice)
+        configuration.allowCredentials = true
+
+        val source = UrlBasedCorsConfigurationSource()
+        source.registerCorsConfiguration("/**", configuration)
+        return source
     }
 }
