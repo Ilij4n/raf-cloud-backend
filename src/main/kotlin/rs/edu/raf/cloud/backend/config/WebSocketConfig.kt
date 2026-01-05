@@ -11,7 +11,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 class WebSocketConfig : WebSocketMessageBrokerConfigurer {
 
     override fun configureMessageBroker(config: MessageBrokerRegistry) {
-        // All the STOMP SEND requests made to the destination with prefix /topic will be fanned out to all the listneners by the broker
+        // All the STOMP SEND requests made to the destination with prefix /topic will be fanned out to all the listeners by the broker
         config.enableSimpleBroker("/topic")
 
         // All the send requests made to the /app destination will be taken in by our backend

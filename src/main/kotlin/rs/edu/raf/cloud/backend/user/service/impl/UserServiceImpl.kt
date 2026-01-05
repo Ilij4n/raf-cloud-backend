@@ -1,20 +1,21 @@
 package rs.edu.raf.cloud.backend.user.service.impl
 
-import org.springframework.security.core.context.SecurityContextHolder
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import org.springframework.web.context.request.RequestContextHolder
+import org.springframework.web.context.request.ServletRequestAttributes
 import rs.edu.raf.cloud.backend.core.auth.TokenService
 import rs.edu.raf.cloud.backend.core.exception.BusinessException
 import rs.edu.raf.cloud.backend.dto.*
 import rs.edu.raf.cloud.backend.user.model.User
 import rs.edu.raf.cloud.backend.user.repository.UserRepository
 import rs.edu.raf.cloud.backend.user.service.UserService
+import rs.edu.raf.cloud.backend.core.auth.PasswordEncoder
 
 @Service
 class UserServiceImpl(
     private val userRepository: UserRepository,
     private val tokenService: TokenService,
-    private val passwordEncoder: PasswordEncoder // We will configure this bean in the next step
+    private val passwordEncoder: PasswordEncoder
 ) : UserService {
 
     override fun login(request: LoginRequest): LoginResponse {
@@ -68,6 +69,10 @@ class UserServiceImpl(
         user.lastName = request.lastName
         user.email = request.email // Note: Real apps often restrict changing email, but specs didn't forbid it
 
+        if(userRepository.existsByEmail(request.email)) {
+            throw BusinessException("Email already in use")
+        }
+
         // If a new password was provided, hash it. If null, keep old hash.
         if (request.password != null) {
             user.passwordHash = passwordEncoder.encode(request.password)
@@ -84,13 +89,16 @@ class UserServiceImpl(
     }
 
     override fun deleteUser(id: Long) {
-        val user = userRepository.findById(id)
-        if (user.isEmpty)
-            throw BusinessException("User not found with id: $id")
+        val targetUser = userRepository.findById(id)
+            .orElseThrow { BusinessException("User not found") }
 
-        val userEmail = SecurityContextHolder.getContext().authentication.name
-        if(user.get().email == userEmail)
-            throw BusinessException("Cannot delete your own account")
+        // Fetch email from context holder
+        val request = (RequestContextHolder.getRequestAttributes() as ServletRequestAttributes).request
+        val currentUserEmail = request.getAttribute("userEmail") as? String
+
+        if (targetUser.email == currentUserEmail) {
+            throw BusinessException("You cannot delete your own account.")
+        }
 
         userRepository.deleteById(id)
     }

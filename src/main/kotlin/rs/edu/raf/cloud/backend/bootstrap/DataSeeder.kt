@@ -1,8 +1,8 @@
 package rs.edu.raf.cloud.backend.bootstrap
 
 import org.springframework.boot.CommandLineRunner
-import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
+import rs.edu.raf.cloud.backend.core.auth.PasswordEncoder
 import rs.edu.raf.cloud.backend.machine.model.MachineStatus
 import rs.edu.raf.cloud.backend.machine.repository.MachineRepository
 import rs.edu.raf.cloud.backend.user.model.Permission
@@ -16,9 +16,10 @@ class DataSeeder(
     private val machineRepository: MachineRepository,
 ) : CommandLineRunner {
 
+    // CommandLineRunner for inserting mock data
     override fun run(vararg args: String?) {
 
-        // 1. Create ADMIN (If not exists)
+        // Admin user (all perms)
         if (!userRepository.existsByEmail("admin@raf.rs")) {
             val admin = User(
                 email = "admin@raf.rs",
@@ -33,7 +34,7 @@ class DataSeeder(
             println("DATA SEEDER: Admin user created (email: admin@raf.rs, pass: admin)")
         }
 
-        // 2. Create REGULAR USER (If not exists)
+        // Regular user
         if (!userRepository.existsByEmail("user@raf.rs")) {
             val user = User(
                 email = "user@raf.rs",
@@ -45,6 +46,7 @@ class DataSeeder(
                     Permission.READ_USER,
                     Permission.SEARCH_MACHINE,
                     Permission.START_MACHINE,
+                    Permission.CREATE_MACHINE,
                     Permission.STOP_MACHINE
                 )
             )
@@ -52,7 +54,7 @@ class DataSeeder(
             println("DATA SEEDER: Regular user created (email: user@raf.rs, pass: user)")
         }
 
-        // 3. Create NO-PERMS USER (To test the "403" or empty state screens)
+        // No perms user
         if (!userRepository.existsByEmail("noperms@raf.rs")) {
             val sadUser = User(
                 email = "noperms@raf.rs",

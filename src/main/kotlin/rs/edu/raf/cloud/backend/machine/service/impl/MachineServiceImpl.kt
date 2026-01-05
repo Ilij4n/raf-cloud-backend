@@ -1,7 +1,9 @@
 package rs.edu.raf.cloud.backend.machine.service.impl
 
-import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import org.springframework.web.context.request.RequestContextHolder
+import org.springframework.web.context.request.ServletRequestAttributes
 import rs.edu.raf.cloud.backend.core.exception.BusinessException
 import rs.edu.raf.cloud.backend.dto.CreateMachineRequest
 import rs.edu.raf.cloud.backend.dto.MachineResponse
@@ -16,7 +18,6 @@ import rs.edu.raf.cloud.backend.user.model.Permission
 import rs.edu.raf.cloud.backend.user.model.User
 import rs.edu.raf.cloud.backend.user.repository.UserRepository
 import java.time.LocalDateTime
-import java.time.ZoneOffset
 
 @Service
 class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (if you aren't using an interface explicitly, class is fine)
@@ -102,28 +103,41 @@ class MachineServiceImpl( // Changed from MachineServiceImpl to MachineService (
         machineRepository.save(machine)
     }
 
-    // --- HELPER FUNCTIONS ---
+    // Helper functions below
 
     private fun User.isAdmin() = permissions.size == Permission.entries.size
 
     private fun findUserOrThrow(): User {
-        val auth = SecurityContextHolder.getContext().authentication
-        val email = auth.name
+        // Gets the http server context object
+        val requestAttributes = RequestContextHolder.getRequestAttributes() as? ServletRequestAttributes
+            ?: throw BusinessException("Request context missing", HttpStatus.INTERNAL_SERVER_ERROR)
+
+        val request = requestAttributes.request
+
+        // Retrieve the email we stored in AuthInterceptor
+        val email = request.getAttribute("userEmail") as? String
+            ?: throw BusinessException("User not authenticated", HttpStatus.UNAUTHORIZED)
+
+        // Fetch from DB
         return userRepository.findByEmail(email)
             .orElseThrow { BusinessException("User not found") }
+
+        // sidenote: these checks might be unnecessary, but they are done so that the compiler does not complain
+        // We should never reach this code with any of the attributes being null, as the AuthInterceptor would most likely throw and end the request prematurely
     }
+
 
     private fun getCurrentUserId(): Long = findUserOrThrow().id!!
 
+    // Throws if the user has no access to the machine (unless the user is an admin user)
     private fun findMachineWithAccessControl(id: Long): Machine {
         val user = findUserOrThrow()
 
         val machine = machineRepository.findByIdAndActiveTrue(id)
             .orElseThrow { BusinessException("Machine not found") }
 
-        // Access Control: If not admin and not owner -> Block
         if (!user.isAdmin() && machine.user?.id != user.id) {
-            throw BusinessException("You do not have access to this machine")
+            throw BusinessException("You do not have access to this machine", HttpStatus.FORBIDDEN)
         }
         return machine
     }

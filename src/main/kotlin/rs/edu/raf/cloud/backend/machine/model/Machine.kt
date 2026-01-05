@@ -27,7 +27,10 @@ class Machine(
     // Relationship to User
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    var user: User? = null
+    var user: User? = null,
+
+    @Version
+    var version: Long = 0
 
 ) {
     override fun equals(other: Any?): Boolean {

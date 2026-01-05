@@ -1,6 +1,7 @@
 package rs.edu.raf.cloud.backend.machine.service.impl
 
 import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.orm.ObjectOptimisticLockingFailureException
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import rs.edu.raf.cloud.backend.dto.MachineResponse
@@ -20,7 +21,6 @@ class MachineAsyncService(
     private val messagingTemplate: SimpMessagingTemplate
 ) {
 
-    // These functions are effectively there to simulate the delay and update the frontend states via socket
     @Async("taskExecutor")
     fun startMachine(machineId: Long) {
         performAction(machineId, MachineOperation.START, MachineStatus.STARTING, MachineStatus.RUNNING)
@@ -34,21 +34,24 @@ class MachineAsyncService(
     @Async("taskExecutor")
     fun restartMachine(machineId: Long) {
         try {
+
             updateAndNotify(machineId, MachineStatus.RESTARTING)
 
             val totalDelay = 10_000L + Random().nextInt(5000)
             val halfDelay = totalDelay / 2
 
-            Thread.sleep(halfDelay)
-            updateAndNotify(machineId, MachineStatus.STOPPED)
+            sleep(halfDelay)
+            updateAndNotify(machineId, MachineStatus.STOPPED, expectedOldStatus = MachineStatus.RESTARTING)
 
-            Thread.sleep(halfDelay)
-            updateAndNotify(machineId, MachineStatus.RUNNING)
+            sleep(halfDelay)
+            updateAndNotify(machineId, MachineStatus.RUNNING, expectedOldStatus = MachineStatus.STOPPED)
 
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            println("Concurrency: Machine $machineId was updated by another thread during RESTART. Aborting.")
         } catch (e: Exception) {
             handleError(machineId, "RESTART", e.message ?: "Unknown error")
-            // If failed, revert to previous state
-            updateAndNotify(machineId, MachineStatus.RUNNING)
+            // Attempt to revert to safe state (Running is usually the assumption if restart fails mid-way)
+            try { updateAndNotify(machineId, MachineStatus.RUNNING) } catch (ignore: Exception) {}
         }
     }
 
@@ -58,30 +61,57 @@ class MachineAsyncService(
         intermediateStatus: MachineStatus,
         finalStatus: MachineStatus
     ) {
-        // Get the status the machine had to be in beforehands in case of error
+        // Determine fallback state logic
         val revertStatus = if (operation == MachineOperation.START) MachineStatus.STOPPED else MachineStatus.RUNNING
 
         try {
+            // Set Intermediate Status
             updateAndNotify(machineId, intermediateStatus)
-            sleepRandomly()
-            updateAndNotify(machineId, finalStatus)
+
+            // Simulate Work
+            sleep(10_000L + Random().nextInt(5000))
+
+            // Note: We only update to final status IF the machine is still in intermediateStatus.
+            // If another thread changed it while we slept, this throws ObjectOptimisticLockingFailureException.
+            updateAndNotify(machineId, finalStatus, expectedOldStatus = intermediateStatus)
+
+        } catch (e: ObjectOptimisticLockingFailureException) {
+            println("Concurrency: Machine $machineId state changed externally during ${operation.name}. Aborting.")
         } catch (e: Exception) {
             handleError(machineId, operation.name, e.message ?: "Unknown error")
-
-            // Revert to original state
-            updateAndNotify(machineId, revertStatus)
+            // Revert
+            try { updateAndNotify(machineId, revertStatus) } catch (ignore: Exception) {}
         }
     }
 
-    fun updateAndNotify(machineId: Long, status: MachineStatus) {
-
-        val machine = machineRepository.findByIdWithUser(machineId)
+    // Updates the machine status, saves to DB, and pushes to WebSockets.
+    // expectedOldStatus: If provided, ensures the DB state matches this before updating. This manually enforces consistency across async sleeps.
+    fun updateAndNotify(machineId: Long, newStatus: MachineStatus, expectedOldStatus: MachineStatus? = null) {
+        // Fetch Machine and user. Using join fetch query to avoid LazyInitException)
+        val machine: Machine = machineRepository.findByIdWithUser(machineId)
             .orElseThrow { RuntimeException("Machine $machineId disappeared during execution") }
 
-        machine.status = status
+        // A rare race condition where two threads might enter the performaction method at the same time, bypassing the check in the machine service
+        // If a thread updates the intermediary state while another thread is sleeping, this will trigger and the operation will be aborted, effectively allowing the last thread which entered
+        // to execute its action
+        if (expectedOldStatus != null && machine.status != expectedOldStatus) {
+            // Throwing this triggers the catch block in performAction/restartMachine, aborting the task.
+            throw ObjectOptimisticLockingFailureException(Machine::class.java, machine.id!!)
+        }
+
+        // Modify and save with version increment
+        machine.status = newStatus
+        // if another thread is updating the data at the same time, this will throw an ObjectOptimisticLockingFailureException due to optimistic lock
         machineRepository.save(machine)
 
-        messagingTemplate.convertAndSend("/topic/machines", machine.toDto())
+        val dto = machine.toDto()
+        // Notify Admin Channel
+        messagingTemplate.convertAndSend("/topic/machines/admin", dto)
+
+        // Notify Specific User Channel
+        // Safe to access user because findByIdWithUser fetched it eagerly
+        val userTopic = "/topic/machines/${machine.user!!.id}"
+        messagingTemplate.convertAndSend(userTopic, dto)
     }
 
     private fun handleError(machineId: Long, operation: String, errorMsg: String) {
@@ -94,7 +124,6 @@ class MachineAsyncService(
         errorMessageRepository.save(error)
     }
 
-    // ... Helper toDto and sleepRandomly ...
     private fun Machine.toDto(): MachineResponse {
         return MachineResponse(
             id = id!!,
@@ -107,10 +136,9 @@ class MachineAsyncService(
         )
     }
 
-    private fun sleepRandomly() {
-        val sleepTime = 10_000L + Random().nextInt(5000)
+    private fun sleep(millis: Long) {
         try {
-            Thread.sleep(sleepTime)
+            Thread.sleep(millis)
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         }

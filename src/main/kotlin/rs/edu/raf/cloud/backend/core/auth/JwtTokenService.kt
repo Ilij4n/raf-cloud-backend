@@ -22,21 +22,22 @@ class JwtTokenService(
     }
 
     override fun generateToken(user: User): String {
-        // Set the expiry date for the token. All requests made with an expired one will be considered invalid
+        // All requests made with an expired one will be considered invalid
         val now = Date()
         val expiryDate = Date(now.time + (jwtExpirationMinutes * 60 * 1000))
 
         // Map the perms onto the claims object
         val permissionsList = user.permissions.map { it.authority }
 
+        // note: both subject, issuedAt (iat) and expiration (exp) are just standardized claims objects with predefined builder functions
         return Jwts.builder()
-            .subject(user.email) // The "ID"
+            .subject(user.email)
             .claim("userId", user.id)
             .claim("permissions", permissionsList)
             .issuedAt(now)
             .expiration(expiryDate)
-            .signWith(getSigningKey()) // Sign it so it can't be tampered with
-            .compact()
+            .signWith(getSigningKey())
+            .compact() // Serializes the builder object and creates the jwt string
     }
 
     override fun extractClaims(token: String): Claims {
