@@ -63,15 +63,15 @@ class UserServiceImpl(
         val user = userRepository.findById(id)
             .orElseThrow { BusinessException("User not found with id: $id") }
 
+        if (request.email != user.email && userRepository.existsByEmail(request.email)) {
+            throw BusinessException("Email already in use")
+        }
+
         // Update fields only
         // Since request fields are val (immutable) but user fields are var (mutable), just assign
         user.firstName = request.firstName
         user.lastName = request.lastName
         user.email = request.email // Note: Real apps often restrict changing email, but specs didn't forbid it
-
-        if(userRepository.existsByEmail(request.email)) {
-            throw BusinessException("Email already in use")
-        }
 
         // If a new password was provided, hash it. If null, keep old hash.
         if (request.password != null) {
